@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #e0f7fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 40px);
+            grid-template-rows: repeat(10, 40px);
+            gap: 2px;
+            margin-top: 10px;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: #b2ebf2;
+            border: 1px solid #00796b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .cell.ship {
+            background-color: gray;
+        }
+
+        .cell.hit {
+            background-color: red;
+        }
+
+        .cell.miss {
+            background-color: white;
+        }
+
+        .cell.hit::after {
+            content: '✖';
+            color: white;
+        }
+
+        .cell.miss::after {
+            content: '○';
+            color: #00796b;
+        }
+
+        .ship-list {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .ship-item {
+            display: inline-block;
+            padding: 10px;
+            background-color: #e17055;
+            border-radius: 5px;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .ship-segment {
+            width: 20px;
+            height: 20px;
+            background-color: gray;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: none;
+            background-color: #00796b;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #004d40;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 1.2em;
+            text-align: center;
+            min-height: 60px;
+        }
+
+        .hidden-ships .cell {
+            background-color: #b2ebf2 !important;
+        }
+
+        .hidden-ships .cell.ship {
+            background-color: transparent !important;
+            border-color: #b2ebf2 !important;
+        }
+
+        .orientation-btn {
+            background: #0984e3;
+        }
+
+        .ship-count {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .difficulty-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .difficulty-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #00796b;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        .difficulty-btn:hover {
+            background-color: #004d40;
+            transform: scale(1.05);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        @media (max-width: 800px) {
+            .grid {
+                grid-template-columns: repeat(10, 30px);
+                grid-template-rows: repeat(10, 30px);
+            }
+            
+            .cell {
+                width: 30px;
+                height: 30px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Battleship Game</h1>
+    
+    <div id="difficultyModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Select Difficulty</h2>
+            <div class="difficulty-buttons">
+                <button class="difficulty-btn" data-difficulty="easy">Easy</button>
+                <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+                <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+                <button class="difficulty-btn" data-difficulty="impossible">Impossible</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <div id="playerContainer">
+            <h2 id="playerHeader">Your Board</h2>
+            <div class="ship-count" id="playerShipsRemaining">Ships remaining: 5</div>
+            <div class="ship-list" id="shipList"></div>
+            <button onclick="toggleOrientation()" class="orientation-btn">Horizontal</button>
+            <div class="grid" id="playerGrid"></div>
+            <button onclick="showDifficultyModal()" id="readyButton" disabled>Ready</button>
+        </div>
+        <div id="enemyContainer">
+            <h2>Enemy Board</h2>
+            <div class="ship-count" id="enemyShipsRemaining">Enemy ships remaining: 5</div>
+            <div class="grid" id="enemyGrid"></div>
+        </div>
+    </div>
+
+    <div class="status" id="status">Place your ships!</div>
+
+    <!-- Sound Effects -->
+    <audio id="placeShipSound" preload="auto">
+        <source src="sounds/place-ship.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="allShipsPlacedSound" preload="auto">
+        <source src="sounds/all-ships-placed.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hitSound" preload="auto">
+        <source src="sounds/hit.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="missSound" preload="auto">
+        <source src="sounds/miss.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sunkSound" preload="auto">
+        <source src="sounds/sunk.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="winSound" preload="auto">
+        <source src="sounds/win.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="loseSound" preload="auto">
+        <source src="sounds/lose.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="easySound" preload="auto">
+        <source src="sounds/easy.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="mediumSound" preload="auto">
+        <source src="sounds/medium.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hardSound" preload="auto">
+        <source src="sounds/hard.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="impossibleSound" preload="auto">
+        <source src="sounds/impossible.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="backgroundMusic" loop preload="auto">
+        <source src="sounds/background.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        class BattleshipGame {
+            constructor() {
+                this.GRID_SIZE = 10;
+                this.SHIP_SIZES = [5, 4, 3, 3, 2];
+                this.SHIP_NAMES = {
+                    2: 'Destroyer',
+                    3: 'Submarine',
+                    4: 'Battleship',
+                    5: 'Carrier'
+                };
+                
+                this.playerGrid = Array(this.GRID_SIZE).fill(0).map(() => Array(this.GRID_SIZE).fill(0));
+                this.enemyGrid = Array(this.GRID_SIZE).fill(0).map(() => Array(this.GRID_SIZE).fill(0));
+                this.gameActive = false;
+                this.currentPlayer = 'player';
+                this.currentOrientation = 'horizontal';
+                this.draggedShip = null;
+                this.shipsPlaced = 0;
+                this.shipsAvailable = this.SHIP_SIZES.slice();
+                this.playerShipsSunk = 0;
+                this.enemyShipsSunk = 0;
+                this.difficulty = 'easy';
+                this.enemyMemory = [];
+                this.lastHit = null;
+                this.cheatMode = false;
+                this.knownPlayerShips = [];
+                this.soundsInitialized = false;
+                
+                this.domCache = {
+                    playerGrid: null,
+                    enemyGrid: null,
+                    status: null,
+                    shipList: null,
+                    readyButton: null,
+                    playerShipsRemaining: null,
+                    enemyShipsRemaining: null,
+                    difficultyModal: null
+                };
+                
+                this.sounds = {
+                    placeShip: null,
+                    allShipsPlaced: null,
+                    hit: null,
+                    miss: null,
+                    sunk: null,
+                    win: null,
+                    lose: null,
+                    easy: null,
+                    medium: null,
+                    hard: null,
+                    impossible: null,
+                    background: null
+                };
+            }
+            
+            init() {
+                this.cacheDOM();
+                this.setupEventListeners();
+                this.createGrid('playerGrid', true);
+                this.createGrid('enemyGrid', false);
+                this.createShipElements();
+                this.updateShipCounts();
+                
+                // Initialize sounds on first user interaction
+                document.body.addEventListener('click', this.initSounds.bind(this), { once: true });
+            }
+            
+            initSounds() {
+                this.sounds.placeShip = document.getElementById('placeShipSound');
+                this.sounds.allShipsPlaced = document.getElementById('allShipsPlacedSound');
+                this.sounds.hit = document.getElementById('hitSound');
+                this.sounds.miss = document.getElementById('missSound');
+                this.sounds.sunk = document.getElementById('sunkSound');
+                this.sounds.win = document.getElementById('winSound');
+                this.sounds.lose = document.getElementById('loseSound');
+                this.sounds.easy = document.getElementById('easySound');
+                this.sounds.medium = document.getElementById('mediumSound');
+                this.sounds.hard = document.getElementById('hardSound');
+                this.sounds.impossible = document.getElementById('impossibleSound');
+                this.sounds.background = document.getElementById('backgroundMusic');
+                
+                // Set volumes
+                Object.values(this.sounds).forEach(sound => {
+                    if (sound) {
+                        sound.volume = 0.5;
+                        if (sound.id === 'backgroundMusic') sound.volume = 0.3; // Lower volume for background music
+                    }
+                });
+                
+                this.soundsInitialized = true;
+            }
+            
+            playSound(soundName) {
+                if (!this.soundsInitialized || !this.sounds[soundName]) return;
+                
+                try {
+                    const sound = this.sounds[soundName];
+                    sound.currentTime = 0;
+                    sound.play().catch(e => {
+                        console.log(`Audio play prevented: ${e}`);
+                    });
+                } catch (e) {
+                    console.log(`Audio error: ${e}`);
+                }
+            }
+            
+            stopSound(soundName) {
+                if (!this.soundsInitialized || !this.sounds[soundName]) return;
+                this.sounds[soundName].pause();
+                this.sounds[soundName].currentTime = 0;
+            }
+            
+            cacheDOM() {
+                this.domCache.playerGrid = document.getElementById('playerGrid');
+                this.domCache.enemyGrid = document.getElementById('enemyGrid');
+                this.domCache.status = document.getElementById('status');
+                this.domCache.shipList = document.getElementById('shipList');
+                this.domCache.readyButton = document.getElementById('readyButton');
+                this.domCache.playerShipsRemaining = document.getElementById('playerShipsRemaining');
+                this.domCache.enemyShipsRemaining = document.getElementById('enemyShipsRemaining');
+                this.domCache.difficultyModal = document.getElementById('difficultyModal');
+                
+                document.querySelector('.close').addEventListener('click', () => {
+                    this.domCache.difficultyModal.style.display = 'none';
+                });
+                
+                window.addEventListener('click', (event) => {
+                    if (event.target === this.domCache.difficultyModal) {
+                        this.domCache.difficultyModal.style.display = 'none';
+                    }
+                });
+            }
+            
+            setupEventListeners() {
+                document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.difficulty = e.target.dataset.difficulty;
+                        this.cheatMode = this.difficulty === 'impossible';
+                        
+                        // Play difficulty selection sound
+                        switch(this.difficulty) {
+                            case 'easy':
+                                this.playSound('easy');
+                                break;
+                            case 'medium':
+                                this.playSound('medium');
+                                break;
+                            case 'hard':
+                                this.playSound('hard');
+                                break;
+                            case 'impossible':
+                                this.playSound('impossible');
+                                break;
+                        }
+                        
+                        this.startGame();
+                    });
+                });
+
+                if ('ontouchstart' in window) {
+                    document.querySelectorAll('.ship-item').forEach(ship => {
+                        ship.addEventListener('touchstart', this.handleDragStart.bind(this), {passive: false});
+                    });
+                    
+                    document.querySelectorAll('#playerGrid .cell').forEach(cell => {
+                        cell.addEventListener('touchmove', this.handleTouchMove.bind(this), {passive: false});
+                        cell.addEventListener('touchend', this.handleTouchEnd.bind(this));
+                    });
+                }
+            }
+            
+            createGrid(gridId, isPlayer) {
+                const gridElement = document.getElementById(gridId);
+                gridElement.innerHTML = '';
+
+                for (let i = 0; i < this.GRID_SIZE; i++) {
+                    for (let j = 0; j < this.GRID_SIZE; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+
+                        if (isPlayer && gridId === 'playerGrid') {
+                            cell.addEventListener('dragover', this.handleDragOver.bind(this));
+                            cell.addEventListener('drop', this.handleDrop.bind(this));
+                        }
+                        else if (!isPlayer && gridId === 'enemyGrid') {
+                            cell.addEventListener('click', (e) => {
+                                const row = parseInt(e.target.dataset.row);
+                                const col = parseInt(e.target.dataset.col);
+                                this.handleAttack(row, col);
+                            });
+                        }
+
+                        gridElement.appendChild(cell);
+                    }
+                }
+            }
+            
+            createShipElements() {
+                this.domCache.shipList.innerHTML = '';
+
+                this.shipsAvailable.forEach((size) => {
+                    const ship = document.createElement('div');
+                    ship.className = 'ship-item';
+                    ship.dataset.size = size;
+                    ship.draggable = true;
+
+                    for (let i = 0; i < size; i++) {
+                        const segment = document.createElement('div');
+                        segment.className = 'ship-segment';
+                        ship.appendChild(segment);
+                    }
+
+                    ship.addEventListener('dragstart', this.handleDragStart.bind(this));
+                    this.domCache.shipList.appendChild(ship);
+                });
+            }
+            
+            handleDragStart(e) {
+                this.draggedShip = { 
+                    size: parseInt(e.target.dataset.size),
+                    element: e.target
+                };
+                
+                if (e.type === 'touchstart') {
+                    e.preventDefault();
+                    this.touchStartX = e.touches[0].clientX;
+                    this.touchStartY = e.touches[0].clientY;
+                }
+            }
+            
+            handleTouchMove(e) {
+                if (!this.draggedShip) return;
+                e.preventDefault();
+                
+                const touch = e.touches[0];
+                this.draggedShip.element.style.position = 'absolute';
+                this.draggedShip.element.style.left = `${touch.clientX - 20}px`;
+                this.draggedShip.element.style.top = `${touch.clientY - 20}px`;
+            }
+            
+            handleTouchEnd(e) {
+                if (!this.draggedShip) return;
+                
+                const touch = e.changedTouches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                if (element && element.classList.contains('cell')) {
+                    const row = parseInt(element.dataset.row);
+                    const col = parseInt(element.dataset.col);
+                    this.handleDrop({
+                        preventDefault: () => {},
+                        target: element
+                    });
+                }
+                
+                if (this.draggedShip.element) {
+                    this.draggedShip.element.style.position = '';
+                    this.draggedShip.element.style.left = '';
+                    this.draggedShip.element.style.top = '';
+                }
+            }
+            
+            handleDragOver(e) {
+                e.preventDefault();
+            }
+            
+            handleDrop(e) {
+                e.preventDefault();
+                
+                const row = parseInt(e.target.dataset.row);
+                const col = parseInt(e.target.dataset.col);
+
+                if (this.draggedShip && this.canPlaceShip(this.playerGrid, row, col, this.draggedShip.size, this.currentOrientation)) {
+                    this.placeShip(this.playerGrid, row, col, this.draggedShip.size, this.currentOrientation);
+                    this.updateBoardDisplay();
+                    this.removeShipFromList(this.draggedShip.size);
+                    this.shipsPlaced++;
+                    
+                    this.playSound('placeShip');
+                    
+                    if (this.shipsPlaced === this.SHIP_SIZES.length) {
+                        this.domCache.readyButton.disabled = false;
+                        this.playSound('allShipsPlaced');
+                        this.domCache.status.innerText = "All ships placed! Click Ready to start!";
+                    }
+                    
+                    this.draggedShip = null;
+                } else {
+                    this.domCache.status.innerText = "Invalid placement! Try again.";
+                }
+            }
+            
+            canPlaceShip(grid, row, col, size, orientation) {
+                const shipSize = parseInt(size);
+                if (isNaN(shipSize)) return false;
+            
+                if (orientation === 'horizontal') {
+                    if (col + shipSize > this.GRID_SIZE) return false;
+                    for (let i = 0; i < shipSize; i++) {
+                        if (grid[row][col + i] !== 0) {
+                            return false;
+                        }
+                    }
+                } else {
+                    if (row + shipSize > this.GRID_SIZE) return false;
+                    for (let i = 0; i < shipSize; i++) {
+                        if (grid[row + i][col] !== 0) {
+                            return false;
+                        }
+                    }
+                }
+                
+                const directions = [
+                    [-1,-1], [-1,0], [-1,1],
+                    [0,-1],          [0,1],
+                    [1,-1],  [1,0],  [1,1]
+                ];
+                
+                if (orientation === 'horizontal') {
+                    for (let i = 0; i < shipSize; i++) {
+                        for (const [dr, dc] of directions) {
+                            const r = row + dr;
+                            const c = col + i + dc;
+                            if (r >= 0 && r < this.GRID_SIZE && c >= 0 && c < this.GRID_SIZE && grid[r][c] > 0) {
+                                return false;
+                            }
+                        }
+                    }
+                } else {
+                    for (let i = 0; i < shipSize; i++) {
+                        for (const [dr, dc] of directions) {
+                            const r = row + i + dr;
+                            const c = col + dc;
+                            if (r >= 0 && r < this.GRID_SIZE && c >= 0 && c < this.GRID_SIZE && grid[r][c] > 0) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            
+            placeShip(grid, row, col, size, orientation) {
+                const shipSize = parseInt(size);
+
+                if (orientation === 'horizontal') {
+                    for (let i = 0; i < shipSize; i++) {
+                        grid[row][col + i] = shipSize;
+                    }
+                } else {
+                    for (let i = row; i < row + shipSize; i++) {
+                        grid[i][col] = shipSize;
+                    }
+                }
+            }
+            
+            updateBoardDisplay() {
+                const playerCells = document.querySelectorAll('#playerGrid .cell');
+
+                playerCells.forEach((cell) => {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    if (this.playerGrid[row][col] > 0) {
+                        cell.classList.add('ship');
+                    } else {
+                        cell.classList.remove('ship');
+                    }
+                });
+            }
+            
+            removeShipFromList(size) {
+                let shipSize = parseInt(size);
+                for (let i = 0; i < this.domCache.shipList.children.length; i++) {
+                    let ship = this.domCache.shipList.children[i];
+
+                    if (parseInt(ship.dataset.size) === shipSize) {   
+                        ship.remove();
+                        this.shipsAvailable.splice(this.shipsAvailable.indexOf(shipSize), 1);
+                        break;
+                    }
+                }
+            }
+            
+            toggleOrientation() {
+                this.currentOrientation = this.currentOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+                document.querySelector('.orientation-btn').textContent =
+                    this.currentOrientation.charAt(0).toUpperCase() + this.currentOrientation.slice(1);
+            }
+            
+            showDifficultyModal() {
+                if (this.shipsPlaced < this.SHIP_SIZES.length) {
+                    this.domCache.status.innerText = "Please place all your ships before proceeding.";
+                    return;
+                }
+                this.domCache.difficultyModal.style.display = 'block';
+            }
+            
+            startGame() {
+                this.domCache.difficultyModal.style.display = 'none';
+                this.domCache.shipList.style.display = 'none';
+                this.domCache.readyButton.style.display = 'none';
+                document.querySelector('.orientation-btn').style.display = 'none';
+                
+                this.placeEnemyShips();
+                this.gameActive = true;
+                this.updateEnemyBoardDisplay();
+                this.domCache.status.innerText = "Game started! Attack the enemy!";
+                
+                // Start background music
+                this.playSound('background');
+                
+                if (this.cheatMode) {
+                    this.cheatModeSetup();
+                }
+            }
+            
+            cheatModeSetup() {
+                this.knownPlayerShips = [];
+                for (let i = 0; i < this.GRID_SIZE; i++) {
+                    for (let j = 0; j < this.GRID_SIZE; j++) {
+                        if (this.playerGrid[i][j] > 0) {
+                            this.knownPlayerShips.push([i, j]);
+                        }
+                    }
+                }
+            }
+            
+            updateEnemyBoardDisplay() {
+                const enemyCells = document.querySelectorAll('#enemyGrid .cell');
+                enemyCells.forEach((cell) => {
+                    cell.classList.remove('ship', 'hit', 'miss');
+                });
+            }
+            
+            placeEnemyShips() {
+                this.SHIP_SIZES.forEach(size => {
+                    let placed = false;
+                    while (!placed) {
+                        const orientation = Math.random() > 0.5 ? 'horizontal' : 'vertical';
+                        const row = Math.floor(Math.random() * this.GRID_SIZE);
+                        const col = Math.floor(Math.random() * this.GRID_SIZE);
+
+                        if (this.canPlaceShip(this.enemyGrid, row, col, size, orientation)) {
+                            this.placeShip(this.enemyGrid, row, col, size, orientation);
+                            placed = true;
+                        }
+                    }
+                });
+            }
+            
+            handleAttack(row, col) {
+                if (!this.gameActive || this.currentPlayer !== 'player') return;
+
+                if (this.enemyGrid[row][col] === -1 || this.enemyGrid[row][col] === -2) {
+                    this.domCache.status.innerText = "You've already attacked this location!";
+                    return;
+                }
+
+                if (this.enemyGrid[row][col] > 0) {
+                    this.enemyGrid[row][col] = -2;
+                    document.querySelector(`#enemyGrid .cell[data-row='${row}'][data-col='${col}']`).classList.add('hit');
+                    this.domCache.status.innerText = "Hit!";
+                    this.playSound('hit');
+                    
+                    const sunkSize = this.isShipSunk(this.enemyGrid, row, col);
+                    if (sunkSize > 0) {
+                        this.enemyShipsSunk++;
+                        this.updateShipCounts();
+                        this.domCache.status.innerText = `Hit! You sunk the enemy's ${this.SHIP_NAMES[sunkSize]}!`;
+                        this.playSound('sunk');
+                    }
+                } else {
+                    this.enemyGrid[row][col] = -1;
+                    document.querySelector(`#enemyGrid .cell[data-row='${row}'][data-col='${col}']`).classList.add('miss');
+                    this.domCache.status.innerText = "Miss!";
+                    this.playSound('miss');
+                }
+
+                if (this.checkWinCondition(this.enemyGrid)) {
+                    this.domCache.status.innerText = "Congratulations! You won!";
+                    this.stopSound('background');
+                    this.playSound('win');
+                    this.gameActive = false;
+                    return;
+                }
+
+                this.currentPlayer = 'enemy';
+                this.enemyTurn();
+            }
+            
+            isShipSunk(grid, row, col) {
+                const originalValue = Math.abs(grid[row][col]);
+                if (originalValue <= 0) return 0;
+                
+                let isSunk = true;
+                
+                for (let i = 0; i < this.GRID_SIZE; i++) {
+                    for (let j = 0; j < this.GRID_SIZE; j++) {
+                        if (Math.abs(grid[i][j]) === originalValue) {
+                            if (grid[i][j] > 0) {
+                                isSunk = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!isSunk) break;
+                }
+                
+                return isSunk ? originalValue : 0;
+            }
+            
+            checkWinCondition(grid) {
+                for (let i = 0; i < this.GRID_SIZE; i++) {
+                    for (let j = 0; j < this.GRID_SIZE; j++) {
+                        if (grid[i][j] > 0) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            enemyTurn() {
+                if (!this.gameActive || this.currentPlayer !== 'enemy') return;
+
+                setTimeout(() => {
+                    let row, col;
+                    
+                    if (this.cheatMode) {
+                        if (this.knownPlayerShips.length > 0) {
+                            [row, col] = this.knownPlayerShips.shift();
+                        } else {
+                            do {
+                                row = Math.floor(Math.random() * this.GRID_SIZE);
+                                col = Math.floor(Math.random() * this.GRID_SIZE);
+                            } while (this.playerGrid[row][col] === -1 || this.playerGrid[row][col] === -2);
+                        }
+                    }
+                    else if (this.difficulty === 'easy' || this.enemyMemory.length === 0) {
+                        do {
+                            row = Math.floor(Math.random() * this.GRID_SIZE);
+                            col = Math.floor(Math.random() * this.GRID_SIZE);
+                        } while (this.playerGrid[row][col] === -1 || this.playerGrid[row][col] === -2);
+                    } 
+                    else if (this.difficulty === 'medium') {
+                        if (this.lastHit) {
+                            const [lastRow, lastCol] = this.lastHit;
+                            const directions = [[0,1], [1,0], [0,-1], [-1,0]];
+                            const possibleTargets = [];
+                            
+                            for (const [dr, dc] of directions) {
+                                const newRow = lastRow + dr;
+                                const newCol = lastCol + dc;
+                                if (newRow >= 0 && newRow < this.GRID_SIZE && 
+                                    newCol >= 0 && newCol < this.GRID_SIZE &&
+                                    this.playerGrid[newRow][newCol] > 0) {
+                                    possibleTargets.push([newRow, newCol]);
+                                }
+                            }
+                            
+                            if (possibleTargets.length > 0) {
+                                [row, col] = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+                            } else {
+                                do {
+                                    row = Math.floor(Math.random() * this.GRID_SIZE);
+                                    col = Math.floor(Math.random() * this.GRID_SIZE);
+                                } while (this.playerGrid[row][col] === -1 || this.playerGrid[row][col] === -2);
+                            }
+                        }
+                    } 
+                    else if (this.difficulty === 'hard') {
+                        if (this.enemyMemory.length > 0) {
+                            const adjacentCells = [];
+                            for (const [r, c] of this.enemyMemory) {
+                                const directions = [[0,1], [1,0], [0,-1], [-1,0]];
+                                for (const [dr, dc] of directions) {
+                                    const newRow = r + dr;
+                                    const newCol = c + dc;
+                                    if (newRow >= 0 && newRow < this.GRID_SIZE && 
+                                        newCol >= 0 && newCol < this.GRID_SIZE &&
+                                        this.playerGrid[newRow][newCol] > 0) {
+                                        adjacentCells.push([newRow, newCol]);
+                                    }
+                                }
+                            }
+                            
+                            if (adjacentCells.length > 0) {
+                                [row, col] = adjacentCells[Math.floor(Math.random() * adjacentCells.length)];
+                            } else {
+                                do {
+                                    row = Math.floor(Math.random() * this.GRID_SIZE);
+                                    col = Math.floor(Math.random() * this.GRID_SIZE);
+                                } while (this.playerGrid[row][col] === -1 || this.playerGrid[row][col] === -2);
+                            }
+                        }
+                    }
+
+                    if (this.playerGrid[row][col] > 0) {
+                        this.playerGrid[row][col] = -2;
+                        document.querySelector(`#playerGrid .cell[data-row='${row}'][data-col='${col}']`).classList.add('hit');
+                        document.querySelector(`#playerGrid .cell[data-row='${row}'][data-col='${col}']`).classList.remove('ship');
+                        this.domCache.status.innerText = "Enemy hit your ship!";
+                        this.playSound('hit');
+                        
+                        if (!this.cheatMode) {
+                            this.lastHit = [row, col];
+                            this.enemyMemory.push([row, col]);
+                        }
+                        
+                        const sunkSize = this.isShipSunk(this.playerGrid, row, col);
+                        if (sunkSize > 0) {
+                            this.playerShipsSunk++;
+                            this.updateShipCounts();
+                            this.domCache.status.innerText = `Enemy hit your ${this.SHIP_NAMES[sunkSize]}! It was sunk!`;
+                            this.playSound('sunk');
+                            
+                            if (!this.cheatMode) {
+                                this.enemyMemory = this.enemyMemory.filter(([r, c]) => 
+                                    !this.isPartOfSunkShip(this.playerGrid, r, c, sunkSize));
+                                this.lastHit = null;
+                            }
+                        }
+                    } else {
+                        this.playerGrid[row][col] = -1;
+                        document.querySelector(`#playerGrid .cell[data-row='${row}'][data-col='${col}']`).classList.add('miss');
+                        this.domCache.status.innerText = "Enemy missed!";
+                        this.playSound('miss');
+                        if (!this.cheatMode) {
+                            this.lastHit = null;
+                        }
+                    }
+
+                    if (this.checkWinCondition(this.playerGrid)) {
+                        this.domCache.status.innerText = "Game over! Enemy won!";
+                        this.stopSound('background');
+                        this.playSound('lose');
+                        this.gameActive = false;
+                        return;
+                    }
+
+                    this.currentPlayer = 'player';
+                }, this.cheatMode ? 100 : 800);
+            }
+            
+            isPartOfSunkShip(grid, row, col, size) {
+                if (Math.abs(grid[row][col]) !== size) return false;
+                
+                const directions = [[0,1], [1,0], [0,-1], [-1,0]];
+                for (const [dr, dc] of directions) {
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+                    if (newRow >= 0 && newRow < this.GRID_SIZE && 
+                        newCol >= 0 && newCol < this.GRID_SIZE &&
+                        grid[newRow][newCol] === -2) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            updateShipCounts() {
+                const playerShipsLeft = this.countAliveShips(this.playerGrid);
+                const enemyShipsLeft = this.countAliveShips(this.enemyGrid);
+                
+                this.domCache.playerShipsRemaining.innerText = `Ships remaining: ${playerShipsLeft}`;
+                this.domCache.enemyShipsRemaining.innerText = `Enemy ships remaining: ${enemyShipsLeft}`;
+            }
+            
+            countAliveShips(grid) {
+                const shipSizes = new Set();
+                
+                for (let i = 0; i < this.GRID_SIZE; i++) {
+                    for (let j = 0; j < this.GRID_SIZE; j++) {
+                        const cellValue = grid[i][j];
+                        if (cellValue > 0) {
+                            shipSizes.add(cellValue);
+                        }
+                    }
+                }
+                
+                return shipSizes.size;
+            }
+        }
+
+        const game = new BattleshipGame();
+        game.init();
+
+        function toggleOrientation() {
+            game.toggleOrientation();
+        }
+
+        function showDifficultyModal() {
+            game.showDifficultyModal();
+        }
+    </script>
+</body>
+</html>
